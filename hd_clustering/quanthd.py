@@ -26,46 +26,7 @@ def quantize(X, bits):
 
 # hyperdimensional clustering algorithm
 class QuantHD_cluster(object):
-    '''
-    Hyperdimensional clustering algorithm. FebHD utilizes a `(c, d)`
-    sized tensor for the model initialized empty. Every vector of this matrix is
-    the high dimensional representation of a cluster. One learning algorithm
-    starts (i.e. through `fit`) the clusters are initialized from input data
-    randomly. After this, iterative algorithm starts.
 
-    During each iteration HDCluster updates the model based on the most similar
-    samples. This iteration continues until the prediction of cluster for all
-    samples remains unchanged for two iterations in a row, or until a preset
-    number of iterations is achieved.
-
-    Args:
-        clusters (int, > 0): The number of clusters of the problem.
-
-        features (int, > 0): Dimensionality of original data.
-
-        dim (int, > 0): The target dimensionality of the high dimensional
-            representation.
-
-    Example:
-        >>> import febhd_clustering
-        >>> dim = 10000
-        >>> n_samples = 1000
-        >>> features = 100
-        >>> clusters = 5
-        >>> bits = 3
-        >>> x = torch.randn(n_samples, features) # dummy data
-        >>> model = febhd_clustering.QuantHD_cluster(clusters, features, bits, dim=dim)
-        >>> if torch.cuda.is_available():
-        ...     print('Training on GPU!')
-        ...     model = model.to('cuda')
-        ...     x = x.to('cuda')
-        ...
-        Training on GPU!
-        >>> model.fit(x, epochs=10)
-        >>> ypred = model(x)
-        >>> ypred.size()
-        torch.Size([1000])
-    '''
     def __init__(self, clusters : int, features : int, bits : int, dim : int = 4000):
 
         self.clusters = clusters
@@ -77,47 +38,14 @@ class QuantHD_cluster(object):
         self.encoder = Encoder(features, dim=self.dim)
 
     def __call__(self, x : torch.Tensor, encoded : bool = False):
-        '''
-        Returns the predicted cluster of each data point in x.
-
-        Args:
-            x (:class:`torch.Tensor`): The data points to predict. Must
-                have size `(n?, dim)` if `encoded=False`, otherwise must
-                have size `(n?, features)`.
-
-            encoded (bool): Specifies if input data is already encoded.
-
-        Returns:
-            :class:`torch.Tensor`: The predicted class of each data point.
-            Has size `(n?,)`.
-        '''
 
         return self.scores(x, encoded=encoded).argmax(1)
 
     def predict(self, x : torch.Tensor, encoded : bool = False):
-        '''
-        Returns predicted class of each element in x. See :func:`__call__`
-        for details.
-        '''
 
         return self(x)
 
     def probabilities(self, x : torch.Tensor, encoded : bool = False):
-        '''
-        Returns the probabilities of belonging to a certain cluster for each
-        data point in x.
-
-        Args:
-            x (:class:`torch.Tensor`): The data points to use. Must
-                have size `(n?, dim)` if `encoded=False`, otherwise must
-                have size `(n?, features)`.
-
-            encoded (bool): Specifies if input data is already encoded.
-
-        Returns:
-            :class:`torch.Tensor`: The cluster probability of each data point.
-            Has size `(n?, clusters)`.
-        '''
 
         return self.scores(x, encoded=encoded).softmax(1)
     
@@ -131,27 +59,6 @@ class QuantHD_cluster(object):
         #return torch.cdist(x1, x2, 1) / x1.shape[1]
 
     def scores(self, x : torch.Tensor, encoded : bool = False):
-        r'''
-        Returns the hamming similarity of each datapoint in `x` with each
-        cluster hypervector. The output of this function is the matrix
-        :math:`\delta` given by:
-
-        .. math:: \delta_{ij} = 1 - \frac{H(sign(x_i), sign(models_j))}{dim}
-
-        Where :math:`x` is the input data, :math:`models` are the cluster
-        hypervectors and :math:`H(\cdot, \cdots)` is the hamming similarity.
-
-        Args:
-            x (:class:`torch.Tensor`): The data points to score. Must
-                have size `(n?, dim)` if `encoded=False`, otherwise must
-                have size `(n?, features)`.
-
-            encoded (bool): Specifies if input data is already encoded.
-
-        Returns:
-            :class:`torch.Tensor`: The predicted class of each data point. Has
-            size `(n?, clusters)`.
-        '''
 
         '''
         h = x if encoded else self.encode(x)
@@ -173,12 +80,7 @@ class QuantHD_cluster(object):
         return -self.dist(h, self.quantized_model)
 
     def encode(self, x : torch.Tensor):
-        '''
-        Encodes input data
-
-        See Also:
-            :class:`febhd.Encoder` for more information.
-        '''
+        
         return self.encoder(x)
     
     def model_projection(self):
@@ -200,31 +102,6 @@ class QuantHD_cluster(object):
             binary_update : bool = False,
             init_model : bool = True,
             labels=None):
-        '''
-        Starts learning process using datapoints `x` as input.
-
-        Args:
-            x (:class:`torch.Tensor`): Input data points. Must
-                have size `(n?, dim)` if `encoded=False`, otherwise must
-                have size `(n?, features)`.
-
-            encoded (bool): Specifies if input data is already encoded.
-
-            epochs (int, > 0): Max number of epochs allowed.
-
-            batch_size (int, > 0 and <= n?, or float, > 0 and <= 1, or None):
-                If int, the number of samples to use in each batch. If float,
-                the fraction of the samples to use in each batch. If none the
-                whole dataset will be used per epoch (same if used 1.0 or n?).
-
-            adaptive_update (bool): Whether to use adaptive update or not.
-
-            binary_update (bool): Whether to use binarized datapoints to update
-                the clustering model or not.
-
-        Returns:
-            :class:`FebHD`: self
-        '''
 
         h = x if encoded else self.encode(x)
         n = h.size(0)
@@ -341,15 +218,6 @@ class QuantHD_cluster(object):
         return self
 
     def to(self, *args):
-        '''
-        Moves data to the device specified, e.g. cuda, cpu or changes
-        dtype of the data representation, e.g. half or double.
-        Because the internal data is saved as torch.tensor, the parameter
-        can be anything that torch accepts. The change is done in-place.
-
-        Returns:
-            :class:`FebHD`: self
-        '''
 
         self.model = self.model.to(*args)
         self.quantized_model = self.quantized_model.to(*args)
