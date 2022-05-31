@@ -92,38 +92,23 @@ class QuantHD_cluster(object):
             self.quantized_model[i] = quantize(self.model[i], self.bits)
         
         return -1
-
-    def fit(self,
-            x : torch.Tensor,
-            encoded : bool = False,
-            epochs : int = 40,
-            batch_size : Union[int, float, None] = None,
-            adaptive_update : bool = True,
-            binary_update : bool = False,
-            init_model : bool = True,
-            labels=None):
+    
+    def init_model(self, x: torch.Tensor, encoded: bool=False, init_mode=2, labels=None):
 
         h = x if encoded else self.encode(x)
         n = h.size(0)
 
-        # converts batch_size to int
-        if batch_size is None:
-            batch_size = n
-        if isinstance(batch_size, float):
-            batch_size = int(batch_size*n)
-
-        # initializes clustering model
-        if init_model:
-            '''
-            # Random select
+        # Random select
+        if init_mode == 0:
             idxs = torch.randperm(n)[:self.clusters]
             self.model.copy_(h[idxs])
-            '''
-            '''
-            # Random
+        
+        # Random
+        if init_mode == 1:
             self.model.copy_(torch.empty(self.clusters, self.dim).uniform_(0.0, 2*math.pi))
-            '''
-            # k-means++
+        
+        # k-means++
+        if init_mode == 2:
             self.model.copy_(torch.zeros(self.clusters, self.dim))
             new_center = random.randint(0, len(h) - 1)
             self.model[0] = h[new_center]
@@ -147,8 +132,31 @@ class QuantHD_cluster(object):
                 self.model[k + 1] = h[new_center]
                 if labels is not None:
                     print(labels[new_center])
-            
-            self.model_projection()
+        
+        self.model_projection()
+
+    def fit(self,
+            x : torch.Tensor,
+            encoded : bool = False,
+            epochs : int = 40,
+            batch_size : Union[int, float, None] = None,
+            adaptive_update : bool = True,
+            binary_update : bool = False,
+            init_model : bool = True,
+            labels=None):
+
+        h = x if encoded else self.encode(x)
+        n = h.size(0)
+
+        # converts batch_size to int
+        if batch_size is None:
+            batch_size = n
+        if isinstance(batch_size, float):
+            batch_size = int(batch_size*n)
+
+        # initializes clustering model
+        if init_model:
+            self.init_model(x, encoded, encoded=encoded, labels=labels)
 
             print(self.model)
             print(self.quantized_model)
