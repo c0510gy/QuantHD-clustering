@@ -10,6 +10,8 @@ from . import Encoder
 
 # X should be the class matrix of shape nClasses * D
 # 0 is mapped to most lowest value and 2^(bits)-1 highest
+
+
 def quantize(X, bits):
     Nbins = 2**bits
     # ultimate cheess
@@ -27,7 +29,7 @@ def quantize(X, bits):
 # hyperdimensional clustering algorithm
 class QuantHD_cluster(object):
 
-    def __init__(self, clusters : int, features : int, bits : int, dim : int = 4000):
+    def __init__(self, clusters: int, features: int, bits: int, dim: int = 4000):
 
         self.clusters = clusters
         self.bits = bits
@@ -37,29 +39,28 @@ class QuantHD_cluster(object):
         self.quantized_model = torch.zeros(self.clusters, self.dim)
         self.encoder = Encoder(features, dim=self.dim)
 
-    def __call__(self, x : torch.Tensor, encoded : bool = False):
+    def __call__(self, x: torch.Tensor, encoded: bool = False):
 
         return self.scores(x, encoded=encoded).argmax(1)
 
-    def predict(self, x : torch.Tensor, encoded : bool = False):
+    def predict(self, x: torch.Tensor, encoded: bool = False):
 
         return self(x)
 
-    def probabilities(self, x : torch.Tensor, encoded : bool = False):
+    def probabilities(self, x: torch.Tensor, encoded: bool = False):
 
         return self.scores(x, encoded=encoded).softmax(1)
-    
-    def dist(self, x1 : torch.Tensor, x2 : torch.Tensor):
+
+    def dist(self, x1: torch.Tensor, x2: torch.Tensor):
 
         x1_norm = x1 / x1.norm(dim=1)[:, None]
         x2_norm = x2 / x2.norm(dim=1)[:, None]
 
         return torch.ones(x1.shape[0], x2.shape[0]) - torch.mm(x1_norm, x2_norm.transpose(0, 1))
 
-        #return torch.cdist(x1, x2, 1) / x1.shape[1]
+        # return torch.cdist(x1, x2, 1) / x1.shape[1]
 
-    def scores(self, x : torch.Tensor, encoded : bool = False):
-
+    def scores(self, x: torch.Tensor, encoded: bool = False):
         '''
         h = x if encoded else self.encode(x)
         #return 1 - torch.cdist(h.sign(), self.quantized_model.sign(), 0)/self.dim
@@ -71,18 +72,45 @@ class QuantHD_cluster(object):
 
         return torch.mm(h_norm, model_norm.transpose(0, 1))
         '''
-        
+
         h = x if encoded else self.encode(x)
-        #return 1 - torch.cdist(h.sign(), self.quantized_model.sign(), 0)/self.dim
+        # return 1 - torch.cdist(h.sign(), self.quantized_model.sign(), 0)/self.dim
 
         h = quantize(h, self.bits)
 
         return -self.dist(h, self.quantized_model)
 
-    def encode(self, x : torch.Tensor):
-        
+    def encode(self, x: torch.Tensor):
+
         return self.encoder(x)
-    
+
+    def random_bit_flip_by_prob(self, prob_table):
+
+        cnt_flipped, tot = 0, 0
+
+        for i in range(self.clusters):
+            for j in range(self.dim):
+
+                prv_qval = max(0, self.quantized_model[i, j] - 1)
+                nxt_qval = min(2**self.bits-1, self.quantized_model[i, j] + 1)
+
+                r = random.random() * 100.
+
+                flipped_val = self.quantized_model[i, j]
+
+                if r < prob_table[int(flipped_val)][1]:
+                    flipped_val = prv_qval
+                elif r < prob_table[int(flipped_val)][1] + prob_table[int(flipped_val)][0]:
+                    flipped_val = nxt_qval
+
+                tot += 1
+                if self.quantized_model[i, j] != flipped_val:
+                    cnt_flipped += 1
+
+                self.quantized_model[i, j] = flipped_val
+
+        return cnt_flipped / tot
+
     def model_projection(self):
 
         if self.bits == -1:
@@ -90,10 +118,10 @@ class QuantHD_cluster(object):
 
         for i in range(self.clusters):
             self.quantized_model[i] = quantize(self.model[i], self.bits)
-        
+
         return -1
-    
-    def init_model(self, x: torch.Tensor, encoded: bool=False, init_mode=2, labels=None):
+
+    def init_model(self, x: torch.Tensor, encoded: bool = False, init_mode=2, labels=None):
 
         h = x if encoded else self.encode(x)
         n = h.size(0)
@@ -102,47 +130,54 @@ class QuantHD_cluster(object):
         if init_mode == 0:
             idxs = torch.randperm(n)[:self.clusters]
             self.model.copy_(h[idxs])
-        
+
         # Random
         if init_mode == 1:
-            self.model.copy_(torch.empty(self.clusters, self.dim).uniform_(0.0, 2*math.pi))
-        
+            self.model.copy_(torch.empty(
+                self.clusters, self.dim).uniform_(0.0, 2*math.pi))
+
         # k-means++
         if init_mode == 2:
             self.model.copy_(torch.zeros(self.clusters, self.dim))
+            new_centers_ = []
             new_center = random.randint(0, len(h) - 1)
+            new_centers_.append(new_center)
             self.model[0] = h[new_center]
-            if labels is not None:
-                print(labels[new_center])
+            # if labels is not None:
+            #    print(labels[new_center])
             dist = torch.zeros(len(h))
             for k in range(self.clusters - 1):
                 dist_pair = self.dist(h, self.model)
 
                 for i in range(len(h)):
-                    
+
                     dist[i] = dist_pair[i, :k+1].min()
-                
+
                 prob_distribution = dist**2
                 prob_distribution /= prob_distribution.sum()
                 new_centers = np.random.choice([i for i in range(len(h))], 10,
-                    p=prob_distribution.numpy())
+                                               p=prob_distribution.numpy())
 
                 new_center = new_centers[0]
-                
+                new_centers_.append(new_center)
+
                 self.model[k + 1] = h[new_center]
-                if labels is not None:
-                    print(labels[new_center])
-        
+                # if labels is not None:
+                #    print(labels[new_center])
+
+            if labels is not None:
+                print('selected initial labels:', sorted(labels[new_centers_]))
+
         self.model_projection()
 
     def fit(self,
-            x : torch.Tensor,
-            encoded : bool = False,
-            epochs : int = 40,
-            batch_size : Union[int, float, None] = None,
-            adaptive_update : bool = True,
-            binary_update : bool = False,
-            init_model : bool = True,
+            x: torch.Tensor,
+            encoded: bool = False,
+            epochs: int = 40,
+            batch_size: Union[int, float, None] = None,
+            adaptive_update: bool = True,
+            binary_update: bool = False,
+            init_model: bool = True,
             labels=None):
 
         h = x if encoded else self.encode(x)
@@ -156,15 +191,15 @@ class QuantHD_cluster(object):
 
         # initializes clustering model
         if init_model:
-            self.init_model(x, encoded, encoded=encoded, labels=labels)
+            self.init_model(x, encoded=encoded, labels=labels)
 
-            print(self.model)
-            print(self.quantized_model)
+            # print(self.model)
+            # print(self.quantized_model)
 
         # previous_preds will store the predictions for all data points
         # of the previous iteration. used for automatic early stopping
         previous_preds = torch.empty(n, dtype=torch.long,
-                device=self.model.device).fill_(self.clusters)
+                                     device=self.model.device).fill_(self.clusters)
 
         # starts iterative training
         for epoch in range(epochs):
@@ -194,7 +229,6 @@ class QuantHD_cluster(object):
                     new_model[lbl] += h_batch_lbl.sum(0)
                     cnt[lbl] += len(h_batch_lbl)
 
-
                 '''
                 # if using binary update, clustering update will used
                 # binarized datapoints instead
@@ -207,20 +241,15 @@ class QuantHD_cluster(object):
                     std, mean = torch.std_mean(scores, 1)
                     alpha = ((max_score - mean)/std).unsqueeze(1)
                     h_batch = alpha*(h_batch.sign())
-
-                # updates each clustering model
-                for lbl in range(self.clusters):
-                    h_batch_lbl = h_batch[preds == lbl]
-                    self.model[lbl] += h_batch_lbl.sum(0)
                 '''
-            #print(cnt)
+            # print(cnt)
             for lbl in range(self.clusters):
                 self.model[lbl].copy_(new_model[lbl] / cnt[lbl])
 
             # early stopping when the model converges
             if not found_new:
                 break
-        
+
         self.model_projection()
 
         return self

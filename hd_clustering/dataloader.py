@@ -2,6 +2,8 @@ import sys
 import struct
 import numpy as np
 import sklearn
+from sklearn import preprocessing
+
 
 class Dataloader:
 
@@ -13,16 +15,19 @@ class Dataloader:
 
         sys.stderr.write("Loading train data... ")
         self.train_param = self.readChoirData(data_path, "train")
-        sys.stderr.write("train data of shape %s loaded\n" % str(self.train_param["data"].shape))
+        sys.stderr.write("train data of shape %s loaded\n" %
+                         str(self.train_param["data"].shape))
 
         sys.stderr.write("Loading test data...  ")
         self.test_param = self.readChoirData(data_path, "test")
-        sys.stderr.write("test  data of shape %s loaded\n" % str(self.test_param["data"].shape))
+        sys.stderr.write("test  data of shape %s loaded\n" %
+                         str(self.test_param["data"].shape))
 
         self.nFeatures = self.train_param["nFeatures"]
         self.nClasses = self.train_param["nClasses"]
 
-        sys.stderr.write("Data Loaded. Num of features = %d Num of Classes = %d" % (self.nFeatures, self.nClasses))
+        sys.stderr.write("Data Loaded. Num of features = %d Num of Classes = %d" % (
+            self.nFeatures, self.nClasses))
 
     # read in data from file
     def readChoirData(self, data_path, data_type):
@@ -41,7 +46,7 @@ class Dataloader:
                     v_in_bytes = f.read(4)
                     if v_in_bytes is None or len(v_in_bytes) == 0:
                         # TODO very unprofessionally normalizing data
-                        X = sklearn.preprocessing.normalize(np.asarray(X), norm='l2')
+                        X = preprocessing.normalize(np.asarray(X), norm='l2')
                         param["nFeatures"], param["nClasses"], param["data"], param["labels"] = \
                             nFeatures, nClasses, X, np.asarray(y)
                         return param
@@ -59,4 +64,4 @@ class Dataloader:
 
     def getParam(self):
         return self.nFeatures, self.nClasses, self.train_param["data"], self.train_param["labels"], \
-               self.test_param["data"], self.test_param["labels"]
+            self.test_param["data"], self.test_param["labels"]

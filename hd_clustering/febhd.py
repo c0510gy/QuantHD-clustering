@@ -6,6 +6,8 @@ import torch
 from . import Encoder
 
 # hyperdimensional clustering algorithm
+
+
 class FebHD(object):
     '''
     Hyperdimensional clustering algorithm. FebHD utilizes a `(c, d)`
@@ -46,7 +48,8 @@ class FebHD(object):
         >>> ypred.size()
         torch.Size([1000])
     '''
-    def __init__(self, clusters : int, features : int, dim : int = 4000):
+
+    def __init__(self, clusters: int, features: int, dim: int = 4000):
 
         self.clusters = clusters
         self.dim = dim
@@ -54,7 +57,7 @@ class FebHD(object):
         self.model = torch.empty(self.clusters, self.dim)
         self.encoder = Encoder(features, dim=self.dim)
 
-    def __call__(self, x : torch.Tensor, encoded : bool = False):
+    def __call__(self, x: torch.Tensor, encoded: bool = False):
         '''
         Returns the predicted cluster of each data point in x.
 
@@ -72,7 +75,7 @@ class FebHD(object):
 
         return self.scores(x, encoded=encoded).argmax(1)
 
-    def predict(self, x : torch.Tensor, encoded : bool = False):
+    def predict(self, x: torch.Tensor, encoded: bool = False):
         '''
         Returns predicted class of each element in x. See :func:`__call__`
         for details.
@@ -80,7 +83,7 @@ class FebHD(object):
 
         return self(x)
 
-    def probabilities(self, x : torch.Tensor, encoded : bool = False):
+    def probabilities(self, x: torch.Tensor, encoded: bool = False):
         '''
         Returns the probabilities of belonging to a certain cluster for each
         data point in x.
@@ -99,7 +102,7 @@ class FebHD(object):
 
         return self.scores(x, encoded=encoded).softmax(1)
 
-    def scores(self, x : torch.Tensor, encoded : bool = False):
+    def scores(self, x: torch.Tensor, encoded: bool = False):
         r'''
         Returns the hamming similarity of each datapoint in `x` with each
         cluster hypervector. The output of this function is the matrix
@@ -125,7 +128,7 @@ class FebHD(object):
         h = x if encoded else self.encode(x)
         return 1 - torch.cdist(h.sign(), self.model.sign(), 0)/self.dim
 
-    def encode(self, x : torch.Tensor):
+    def encode(self, x: torch.Tensor):
         '''
         Encodes input data
 
@@ -135,12 +138,13 @@ class FebHD(object):
         return self.encoder(x)
 
     def fit(self,
-            x : torch.Tensor,
-            encoded : bool = False,
-            epochs : int = 40,
-            batch_size : Union[int, float, None] = None,
-            adaptive_update : bool = True,
-            binary_update : bool = False):
+            x: torch.Tensor,
+            encoded: bool = False,
+            epochs: int = 40,
+            batch_size: Union[int, float, None] = None,
+            adaptive_update: bool = True,
+            binary_update: bool = False,
+            labels=None):
         '''
         Starts learning process using datapoints `x` as input.
 
@@ -183,7 +187,9 @@ class FebHD(object):
         # previous_preds will store the predictions for all data points
         # of the previous iteration. used for automatic early stopping
         previous_preds = torch.empty(n, dtype=torch.long,
-                device=self.model.device).fill_(self.clusters)
+                                     device=self.model.device).fill_(self.clusters)
+
+        history = []
 
         # starts iterative training
         for epoch in range(epochs):
@@ -220,10 +226,18 @@ class FebHD(object):
                     h_batch_lbl = h_batch[preds == lbl]
                     self.model[lbl] += h_batch_lbl.sum(0)
 
+            if labels is not None:
+                scores = self.scores(h, encoded=True)
+                max_score, preds = scores.max(1)
+                train_acc = (preds == torch.tensor(labels)
+                             ).sum().item() / len(preds)
+                history.append(train_acc)
+
             # early stopping when the model converges
             if not found_new:
                 break
-        return self
+
+        return history
 
     def to(self, *args):
         '''
