@@ -71,11 +71,13 @@ def run_clustering(nFeatures: int,
                    dim: int,
                    epochs: int,
                    prob_table: typing.List[typing.List[float]],
-                   flip_inference_only: bool = False):
+                   flip_inference_only: bool = False,
+                   plot: bool = False):
 
     clusters = nClasses
     features = nFeatures
     model = hd_clustering.QuantHD_cluster(clusters, features, bits, dim=dim)
+    best_model = deepcopy(model)
 
     history = []
 
@@ -111,6 +113,65 @@ def run_clustering(nFeatures: int,
             best_model = deepcopy(model)
 
     print(max_acc)
+
+    if plot:
+        plt.figure()
+        ypred = best_model(torch.tensor(traindata.astype(np.float32)))
+        for i in range(len(traindata)):
+            x, y = traindata[i, 0],  traindata[i, 1]
+            color = ['red', 'green', 'blue'][ypred[i]]
+            plt.scatter(x, y, c=color, alpha=1, edgecolor="none")
+        plt.show()
+
+    return history
+
+
+def run_clustering_fullprecision(nFeatures: int,
+                                 nClasses: int,
+                                 traindata: np.ndarray,
+                                 trainlabels: np.ndarray,
+                                 testdata: np.ndarray,
+                                 testlabels: np.ndarray,
+                                 dim: int,
+                                 epochs: int,
+                                 plot: bool = False):
+
+    clusters = nClasses
+    features = nFeatures
+    model = hd_clustering.QuantHD_cluster(clusters, features, -1, dim=dim)
+    best_model = deepcopy(model)
+
+    history = []
+
+    max_acc = 0.
+    for epoch in range(epochs):
+
+        model.fit(torch.tensor(traindata.astype(np.float32)),
+                  epochs=1, init_model=(not epoch), labels=trainlabels)
+
+        ypred = model(torch.tensor(traindata.astype(np.float32)))
+        train_acc = (ypred == torch.tensor(trainlabels)
+                     ).sum().item() / len(ypred)
+
+        #print(epoch, train_acc)
+        history.append(train_acc)
+
+        #max_acc = max(max_acc, train_acc)
+        if max_acc < train_acc:
+
+            max_acc = train_acc
+            best_model = deepcopy(model)
+
+    print(max_acc)
+
+    if plot:
+        plt.figure()
+        ypred = best_model(torch.tensor(traindata.astype(np.float32)))
+        for i in range(len(traindata)):
+            x, y = traindata[i, 0],  traindata[i, 1]
+            color = ['red', 'green', 'blue'][ypred[i]]
+            plt.scatter(x, y, c=color, alpha=1, edgecolor="none")
+        plt.show()
 
     return history
 

@@ -32,7 +32,7 @@ class QuantHD_cluster(object):
     def __init__(self, clusters: int, features: int, bits: int, dim: int = 4000):
 
         self.clusters = clusters
-        self.bits = bits
+        self.bits = bits  # full precision if bits == -1
         self.dim = dim
 
         self.model = torch.zeros(self.clusters, self.dim)
@@ -75,6 +75,9 @@ class QuantHD_cluster(object):
 
         h = x if encoded else self.encode(x)
         # return 1 - torch.cdist(h.sign(), self.quantized_model.sign(), 0)/self.dim
+
+        if self.bits == -1:
+            return -self.dist(h, self.model)
 
         h = quantize(h, self.bits)
 
