@@ -2,10 +2,12 @@ import hd_clustering
 import torch
 import numpy as np
 from sklearn import datasets
+from sklearn import preprocessing
 import json
 import typing
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from itertools import permutations
 
 DATA_LOC = '../Conventional_Data/'
 
@@ -38,6 +40,8 @@ def get_iris_dataset(max_samples):
     X = iris.data[:max_samples]
     y = iris.target[:max_samples]
 
+    X = preprocessing.normalize(np.asarray(X), norm='l2')
+
     nFeatures = X.shape[1]
     nClasses = 3
 
@@ -59,6 +63,22 @@ def get_prob_table_from_prob(prob: float, bits: int):
     prob_table[-1] = [0., prob * 100]
 
     return prob_table
+
+
+def cal_accuracy(nClasses, preds, labels):
+    # cal purity (quality of a clustering)
+
+    cnt_mat = [[0] * nClasses for _ in range(nClasses)]
+    for pred, label in zip(preds, labels):
+        cnt_mat[pred][label] += 1
+
+    acc = 0
+    for cluster in range(nClasses):
+        pred = np.argmax(cnt_mat[cluster])
+        acc += cnt_mat[cluster][pred]
+    acc /= len(preds)
+
+    return acc
 
 
 def run_clustering(nFeatures: int,
@@ -93,15 +113,21 @@ def run_clustering(nFeatures: int,
             copied_model.random_bit_flip_by_prob(prob_table)
 
             ypred = copied_model(torch.tensor(traindata.astype(np.float32)))
+            train_acc = cal_accuracy(nClasses, ypred, trainlabels)
+            '''
             train_acc = (ypred == torch.tensor(trainlabels)
                          ).sum().item() / len(ypred)
+            '''
         else:
 
             model.random_bit_flip_by_prob(prob_table)
 
             ypred = model(torch.tensor(traindata.astype(np.float32)))
+            train_acc = cal_accuracy(nClasses, ypred, trainlabels)
+            '''
             train_acc = (ypred == torch.tensor(trainlabels)
                          ).sum().item() / len(ypred)
+            '''
 
         #print(epoch, train_acc)
         history.append(train_acc)
@@ -150,8 +176,11 @@ def run_clustering_fullprecision(nFeatures: int,
                   epochs=1, init_model=(not epoch), labels=trainlabels)
 
         ypred = model(torch.tensor(traindata.astype(np.float32)))
+        train_acc = cal_accuracy(nClasses, ypred, trainlabels)
+        '''
         train_acc = (ypred == torch.tensor(trainlabels)
                      ).sum().item() / len(ypred)
+        '''
 
         #print(epoch, train_acc)
         history.append(train_acc)
