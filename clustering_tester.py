@@ -20,6 +20,8 @@ def get_mnist_dataset(max_samples):
     traindata = traindata[:max_samples]
     trainlabels = trainlabels[:max_samples]
 
+    print('unique classes:', np.unique(trainlabels).size)
+
     return nFeatures, nClasses, traindata, trainlabels, testdata, testlabels
 
 
@@ -30,6 +32,8 @@ def get_isolet_dataset(max_samples):
     nFeatures, nClasses, traindata, trainlabels, testdata, testlabels = dl.getParam()
     traindata = traindata[:max_samples]
     trainlabels = trainlabels[:max_samples]
+
+    print('unique classes:', np.unique(trainlabels).size)
 
     return nFeatures, nClasses, traindata, trainlabels, testdata, testlabels
 
@@ -110,7 +114,8 @@ def run_clustering(nFeatures: int,
         if flip_inference_only:
 
             copied_model = deepcopy(model)
-            copied_model.random_bit_flip_by_prob(prob_table)
+            if prob_table is not None:
+                copied_model.random_bit_flip_by_prob(prob_table)
 
             ypred = copied_model(torch.tensor(traindata.astype(np.float32)))
             train_acc = cal_accuracy(nClasses, ypred, trainlabels)
@@ -120,7 +125,8 @@ def run_clustering(nFeatures: int,
             '''
         else:
 
-            model.random_bit_flip_by_prob(prob_table)
+            if prob_table is not None:
+                model.random_bit_flip_by_prob(prob_table)
 
             ypred = model(torch.tensor(traindata.astype(np.float32)))
             train_acc = cal_accuracy(nClasses, ypred, trainlabels)
