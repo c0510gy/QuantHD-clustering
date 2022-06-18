@@ -22,7 +22,7 @@ def save_as_json(filename, data):
 
 def gen_prob_table(prob, bits):
 
-    table = [prob * 100. / 2 for _ in range(2**bits)]
+    table = [[prob * 100. / 2, prob * 100. / 2] for _ in range(2**bits)]
     table[0] = [prob * 100., 0.]
     table[-1] = [0., prob * 100.]
 
