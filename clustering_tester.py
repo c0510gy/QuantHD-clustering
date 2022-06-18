@@ -7,9 +7,26 @@ import json
 import typing
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from tqdm import tqdm
 from itertools import permutations
+from multiprocessing import Process, Manager
 
 DATA_LOC = '../Conventional_Data/'
+
+
+def save_as_json(filename, data):
+
+    with open(filename, 'w', encoding='utf8') as f:
+        json.dump(data, f)
+
+
+def gen_prob_table(prob, bits):
+
+    table = [prob * 100. / 2 for _ in range(2**bits)]
+    table[0] = [prob * 100., 0.]
+    table[-1] = [0., prob * 100.]
+
+    return table
 
 
 def get_mnist_dataset(max_samples):
@@ -209,6 +226,180 @@ def run_clustering_fullprecision(nFeatures: int,
         plt.show()
 
     return history
+
+
+def run_trials(nFeatures: int,
+               nClasses: int,
+               traindata: np.ndarray,
+               trainlabels: np.ndarray,
+               testdata: np.ndarray,
+               testlabels: np.ndarray,
+               bits,
+               dim,
+               epochs,
+               prob_table,
+               flip_inference_only,
+               plot,
+               num_trials: int,
+               return_name=None,
+               return_dict=None,):
+
+    print(return_name)
+
+    histories = []
+    for trial in tqdm(range(num_trials)):
+        history = run_clustering(
+            nFeatures,
+            nClasses,
+            traindata,
+            trainlabels,
+            testdata,
+            testlabels,
+            bits,
+            dim,
+            epochs,
+            prob_table,
+            flip_inference_only,
+            plot,
+        )
+        histories.append(history)
+
+    if return_dict is not None:
+        return_dict[return_name] = histories
+
+    return histories
+
+
+def run_full_trials(nFeatures: int,
+                    nClasses: int,
+                    traindata: np.ndarray,
+                    trainlabels: np.ndarray,
+                    testdata: np.ndarray,
+                    testlabels: np.ndarray,
+                    epochs: int,
+                    dim: int,
+                    num_trials: int,
+                    return_name=None,
+                    return_dict=None,):
+
+    print(return_name)
+
+    histories = []
+    for trial in tqdm(range(num_trials)):
+        history = run_clustering_fullprecision(
+            nFeatures,
+            nClasses,
+            traindata,
+            trainlabels,
+            testdata,
+            testlabels,
+            dim,
+            epochs,
+        )
+        histories.append(history)
+
+    if return_dict is not None:
+        return_dict[return_name] = histories
+
+    return histories
+
+
+def run_all(nFeatures: int,
+            nClasses: int,
+            traindata: np.ndarray,
+            trainlabels: np.ndarray,
+            testdata: np.ndarray,
+            testlabels: np.ndarray,
+            epochs: int,
+            bits: int,
+            flip_inference_only: bool):
+
+    # full precision, 100, 400, 800, 1500, 3000, 10k
+    # 0%, 5%, 20%, 50% and 90%
+
+    dims = [100, 400, 800, 1500, 3000, 10000]
+    probs = [0., 0.05, 0.20, 0.50, 0.90]
+    num_trials = 10
+
+    manager = Manager()
+    return_dict = manager.dict()
+
+    processes = []
+
+    for dim in dims:
+        for prob in probs:
+
+            prob_table = gen_prob_table(prob)
+
+            processes.append(Process(target=run_trials,
+                                     args=(nFeatures,
+                                           nClasses,
+                                           traindata,
+                                           trainlabels,
+                                           testdata,
+                                           testlabels,
+                                           bits,
+                                           dim,
+                                           epochs,
+                                           prob_table,
+                                           flip_inference_only,
+                                           False,
+                                           num_trials,
+                                           f'{dim}_{prob}',
+                                           return_dict,)))
+
+    for i in range(len(processes)):
+        processes[i].start()
+
+    for i in range(len(processes)):
+        processes[i].join()
+
+    results = return_dict.items()
+    return results
+
+
+def run_full_all(nFeatures: int,
+                 nClasses: int,
+                 traindata: np.ndarray,
+                 trainlabels: np.ndarray,
+                 testdata: np.ndarray,
+                 testlabels: np.ndarray,
+                 epochs: int,):
+
+    # full precision, 100, 400, 800, 1500, 3000, 10k
+    # 0%, 5%, 20%, 50% and 90%
+
+    dims = [100, 400, 800, 1500, 3000, 10000]
+    num_trials = 10
+
+    manager = Manager()
+    return_dict = manager.dict()
+
+    processes = []
+
+    for dim in dims:
+
+        processes.append(Process(target=run_full_trials,
+                                 args=(nFeatures,
+                                       nClasses,
+                                       traindata,
+                                       trainlabels,
+                                       testdata,
+                                       testlabels,
+                                       dim,
+                                       epochs,
+                                       num_trials,
+                                       f'fullprecision_{dim}',
+                                       return_dict,)))
+
+    for i in range(len(processes)):
+        processes[i].start()
+
+    for i in range(len(processes)):
+        processes[i].join()
+
+    results = return_dict.items()
+    return results
 
 
 def plot_histories(histories, title=None, yrange=None):
