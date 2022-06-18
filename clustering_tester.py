@@ -211,11 +211,15 @@ def run_clustering_fullprecision(nFeatures: int,
     return history
 
 
-def plot_histories(histories):
+def plot_histories(histories, title=None, yrange=None):
 
     plt.figure(figsize=(10, 7))
     for history in histories:
         plt.plot(history)
+    if title is not None:
+        plt.title(title)
+    if yrange is not None:
+        plt.ylim(yrange)
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.show()
