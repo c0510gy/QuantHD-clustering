@@ -329,7 +329,7 @@ def run_all(nFeatures: int,
     for dim in dims:
         for prob in probs:
 
-            prob_table = gen_prob_table(prob)
+            prob_table = gen_prob_table(prob, bits)
 
             processes.append(Process(target=run_trials,
                                      args=(nFeatures,
