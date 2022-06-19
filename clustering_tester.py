@@ -7,7 +7,7 @@ import json
 import typing
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from itertools import permutations
 from multiprocessing import Process, Manager
 
@@ -321,12 +321,15 @@ def run_all(nFeatures: int,
     probs = [0., 0.05, 0.20, 0.50, 0.90]
     num_trials = 10
 
-    manager = Manager()
-    return_dict = manager.dict()
-
-    processes = []
+    results = []
 
     for dim in dims:
+
+        manager = Manager()
+        return_dict = manager.dict()
+
+        processes = []
+
         for prob in probs:
 
             prob_table = gen_prob_table(prob, bits)
@@ -348,11 +351,13 @@ def run_all(nFeatures: int,
                                            f'{dim}_{prob}',
                                            return_dict,)))
 
-    for i in range(len(processes)):
-        processes[i].start()
+        for i in range(len(processes)):
+            processes[i].start()
 
-    for i in range(len(processes)):
-        processes[i].join()
+        for i in range(len(processes)):
+            processes[i].join()
+
+        results.extend(return_dict.items())
 
     results = return_dict.items()
     return results
@@ -386,8 +391,8 @@ def run_full_all(nFeatures: int,
                                        trainlabels,
                                        testdata,
                                        testlabels,
-                                       dim,
                                        epochs,
+                                       dim,
                                        num_trials,
                                        f'fullprecision_{dim}',
                                        return_dict,)))
