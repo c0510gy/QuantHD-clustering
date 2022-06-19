@@ -359,7 +359,6 @@ def run_all(nFeatures: int,
 
         results.extend(return_dict.items())
 
-    results = return_dict.items()
     return results
 
 
