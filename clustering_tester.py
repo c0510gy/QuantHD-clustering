@@ -322,6 +322,8 @@ def run_all(nFeatures: int,
     probs = [0., 0.05, 0.20, 0.50, 0.90]
     num_trials = 10
 
+    multi_threading_max = 3
+
     results = []
 
     for dim in dims:
@@ -352,11 +354,12 @@ def run_all(nFeatures: int,
                                            f'{dim}_{prob}',
                                            return_dict,)))
 
-        for i in range(len(processes)):
-            processes[i].start()
+        for si in range(0, len(processes), multi_threading_max):
+            for i in range(si, min(si + multi_threading_max, len(processes))):
+                processes[i].start()
 
-        for i in range(len(processes)):
-            processes[i].join()
+            for i in range(si, min(si + multi_threading_max, len(processes))):
+                processes[i].join()
 
         results.extend(return_dict.items())
 
