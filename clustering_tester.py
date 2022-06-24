@@ -10,6 +10,7 @@ from copy import deepcopy
 from tqdm.notebook import tqdm
 from itertools import permutations
 from multiprocessing import Process, Manager
+import random
 
 DATA_LOC = '../Conventional_Data/'
 
@@ -418,3 +419,64 @@ def plot_histories(histories, title=None, yrange=None):
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.show()
+
+
+def run_clustering_validation(nFeatures: int,
+                              nClasses: int,
+                              traindata: np.ndarray,
+                              trainlabels: np.ndarray,
+                              testdata: np.ndarray,
+                              testlabels: np.ndarray,
+                              bits: int,
+                              dim: int,
+                              epochs: int,
+                              prob_table: typing.List[typing.List[float]],):
+
+    clusters = nClasses
+    features = nFeatures
+    model = hd_clustering.QuantHD_cluster(clusters, features, bits, dim=dim)
+    best_model = deepcopy(model)
+
+    history = []
+
+    max_acc = 0.
+    for epoch in range(epochs):
+
+        model.fit(torch.tensor(traindata.astype(np.float32)),
+                  epochs=1, init_model=(not epoch), labels=trainlabels)
+
+        class_idx = random.randint(0, model.clusters - 1)
+        original_h = np.copy(
+            model.quantized_model[class_idx].cpu().detach().numpy())
+        if prob_table is not None:
+            model.random_bit_flip_by_prob(prob_table)
+        flipped_h = np.copy(
+            model.quantized_model[class_idx].cpu().detach().numpy())
+
+        flipped_rate = (original_h != flipped_h).sum() / dim
+
+        print('=========================================')
+        print('Original', original_h)
+        print('Flipped', flipped_h)
+        print('% of symbols flipped', flipped_rate * 100)
+        print('=========================================')
+
+        ypred = model(torch.tensor(traindata.astype(np.float32)))
+        train_acc = cal_accuracy(nClasses, ypred, trainlabels)
+        '''
+        train_acc = (ypred == torch.tensor(trainlabels)
+                        ).sum().item() / len(ypred)
+        '''
+
+        #print(epoch, train_acc)
+        history.append(train_acc)
+
+        #max_acc = max(max_acc, train_acc)
+        if max_acc < train_acc:
+
+            max_acc = train_acc
+            best_model = deepcopy(model)
+
+    print(max_acc)
+
+    return history
